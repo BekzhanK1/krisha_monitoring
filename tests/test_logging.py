@@ -13,9 +13,7 @@ def clear_settings_cache() -> None:
     get_settings.cache_clear()
 
 
-def test_setup_logging_runs_without_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_setup_logging_runs_without_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@host:5432/db")
     monkeypatch.chdir(tmp_path)
 

@@ -1,26 +1,10 @@
 import uuid
-from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.repositories import apartment_repo, complex_repo, price_repo
-
-
-@pytest.fixture
-async def db_session() -> AsyncIterator[AsyncSession]:
-    get_settings.cache_clear()
-    engine = create_async_engine(
-        get_settings().database_url,
-        poolclass=NullPool,
-    )
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
-    await engine.dispose()
 
 
 def _apartment_data(complex_id: int, external_id: str) -> dict:
@@ -103,8 +87,17 @@ async def test_apartment_repo_mark_inactive(db_session: AsyncSession) -> None:
         db_session,
         _apartment_data(complex_.id, removed_id),
     )
+    old_seen = datetime.now(UTC) - timedelta(minutes=61)
+    removed.last_seen_at = old_seen
+    await db_session.flush()
 
-    marked = await apartment_repo.mark_inactive(db_session, [kept_id], complex_.id)
+    marked = await apartment_repo.mark_inactive(
+        db_session,
+        [kept_id],
+        complex_.id,
+        parser_interval_minutes=30,
+        complex_name=complex_.name,
+    )
     assert len(marked) == 1
     assert marked[0].external_id == removed_id
     assert marked[0].is_active is False

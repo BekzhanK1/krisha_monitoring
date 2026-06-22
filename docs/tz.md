@@ -273,8 +273,10 @@
 
 ### Версия 2
 
-- Аналитика
-- Скоринг
+- [План V2](plan-v2.md)
+- [Epic 6 — Аналитика](epics/epic-6-analytics.md)
+- [Epic 7 — Скоринг](epics/epic-7-scoring.md)
+- [Epic 8 — Telegram V2](epics/epic-8-telegram-v2.md)
 
 ### Версия 3
 

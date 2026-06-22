@@ -1,6 +1,7 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -110,12 +111,19 @@ async def mark_inactive(
     session: AsyncSession,
     external_ids_to_keep: list[str],
     complex_id: int,
+    *,
+    parser_interval_minutes: int,
+    complex_name: str = "",
 ) -> list[Apartment]:
+    cutoff = datetime.now(UTC) - timedelta(minutes=2 * parser_interval_minutes)
+    keep_ids = external_ids_to_keep or [""]
+
     result = await session.execute(
         select(Apartment).where(
             Apartment.complex_id == complex_id,
             Apartment.is_active.is_(True),
-            Apartment.external_id.not_in(external_ids_to_keep),
+            Apartment.external_id.not_in(keep_ids),
+            Apartment.last_seen_at < cutoff,
         ),
     )
     marked = list(result.scalars().all())
@@ -131,4 +139,7 @@ async def mark_inactive(
         )
 
     await session.flush()
+    label = complex_name or str(complex_id)
+    logger.info("Marked {} apartments as inactive in {}", len(marked), label)
+    # TODO (Epic 5): send Telegram notifications for watchlist apartments in `marked`
     return marked

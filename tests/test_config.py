@@ -12,9 +12,7 @@ def clear_settings_cache() -> None:
     get_settings.cache_clear()
 
 
-def test_settings_loads_from_env(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_settings_loads_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@host:5432/db")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")

@@ -11,10 +11,23 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: int = 0
     parser_interval_minutes: int = 30
+    scraper_max_listings: int | None = None
     log_level: str = "INFO"
     environment: Literal["development", "production"] = "development"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("scraper_max_listings", mode="before")
+    @classmethod
+    def normalize_scraper_max_listings(cls, value: object) -> int | None:
+        if value in ("", None):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            return int(value)
+        msg = "SCRAPER_MAX_LISTINGS must be an integer"
+        raise ValueError(msg)
 
     @field_validator("database_url")
     @classmethod
@@ -23,8 +36,7 @@ class Settings(BaseSettings):
         url = make_url(normalized)
         if url.host is None:
             msg = (
-                "DATABASE_URL must include a host, e.g. "
-                "postgresql+asyncpg://user:pass@host:5432/db"
+                "DATABASE_URL must include a host, e.g. postgresql+asyncpg://user:pass@host:5432/db"
             )
             raise ValueError(msg)
         return normalized
