@@ -12,11 +12,11 @@
 
 | # | Задача | Статус |
 |---|---|---|
-| 7.1 | [Вероятность собственника](#задача-71--вероятность-собственника) | 🔲 |
-| 7.2 | [Инвестиционный рейтинг A+–D](#задача-72--инвестиционный-рейтинг-ad) | 🔲 |
-| 7.3 | [Финансовая модель сделки](#задача-73--финансовая-модель-сделки) | 🔲 |
-| 7.4 | [Таблица `apartment_scores`](#задача-74--таблица-apartment_scores) | 🔲 |
-| 7.5 | [Интеграция в DealAnalyzer](#задача-75--интеграция-в-dealanalyzer) | 🔲 |
+| 7.1 | [Вероятность собственника](#задача-71--вероятность-собственника) | ✅ |
+| 7.2 | [Инвестиционный рейтинг A+–D](#задача-72--инвестиционный-рейтинг-ad) | ✅ |
+| 7.3 | [Финансовая модель сделки](#задача-73--финансовая-модель-сделки) | ✅ |
+| 7.4 | [Таблица `apartment_scores`](#задача-74--таблица-apartment_scores) | ✅ |
+| 7.5 | [Интеграция в DealAnalyzer](#задача-75--интеграция-в-dealanalyzer) | ✅ |
 
 ---
 
@@ -26,11 +26,11 @@
 
 ### Чеклист
 
-- [ ] `app/analyzer/seller_scorer.py` — `estimate_owner_probability(seller, description) -> float`
-- [ ] Обновление `owner_probability` при scrape в `_upsert_seller`
-- [ ] Эвристики: owner → 0.9, agent → 0.2, agency → 0.1
-- [ ] Бонусы: «от собственника» в тексте +0.1, «агентство» −0.2
-- [ ] Тесты на комбинации типов и текста
+- [x] `app/analyzer/seller_scorer.py` — `estimate_owner_probability(seller, description) -> float`
+- [x] Обновление `owner_probability` при scrape в `_upsert_seller`
+- [x] Эвристики: owner → 0.85, agent → 0.25, agency → 0.10
+- [x] Бонусы: «от собственника» в тексте +0.1, «агентство» −0.15
+- [x] Тесты на комбинации типов и текста
 
 ### Курсор-промпт
 
@@ -69,11 +69,11 @@ def estimate_owner_probability(
 
 ### Чеклист
 
-- [ ] `app/analyzer/investment_scorer.py` — класс `InvestmentScorer`
-- [ ] Enum `InvestmentGrade`: A_PLUS, A, B, C, D
-- [ ] Метод `score(apartment, market_stats, deal_signals) -> ScoredApartment`
-- [ ] Веса: дисконт, мотивация, owner_probability, скорость продажи ЖК, этаж/год
-- [ ] Документация порогов в docstring
+- [x] `app/analyzer/investment_scorer.py` — класс `InvestmentScorer`
+- [x] Enum `InvestmentGrade`: A_PLUS, A, B, C, D
+- [x] Метод `score(apartment, market_stats, deal_signals) -> ScoredApartment`
+- [x] Веса: дисконт, мотивация, owner_probability, скорость продажи ЖК, этаж/год
+- [x] Документация порогов в docstring
 
 ### Шкала (черновик)
 
@@ -136,11 +136,11 @@ def score(self, apartment, market_stats, *, deal: Deal | None = None, owner_prob
 
 ### Чеклист
 
-- [ ] `app/analyzer/financial_model.py` — `DealFinancials`
-- [ ] Параметры по умолчанию в `app/config.py` или отдельный `InvestmentSettings`
-- [ ] `expected_sale_price` — медиана ЖК или fair value из market_stats
-- [ ] Поля: purchase_price, renovation_cost, taxes, total_cost, profit, roi_pct
-- [ ] Тесты на типовую 2-комнатную сделку
+- [x] `app/analyzer/financial_model.py` — `DealFinancials`
+- [x] Параметры по умолчанию в `app/config.py` или отдельный `InvestmentSettings`
+- [x] `expected_sale_price` — медиана ЖК или fair value из market_stats
+- [x] Поля: purchase_price, renovation_cost, taxes, total_cost, profit, roi_pct
+- [x] Тесты на типовую 2-комнатную сделку
 
 ### Формула (упрощённая V2)
 
@@ -197,11 +197,14 @@ def calculate_deal_financials(
 
 ### Чеклист
 
-- [ ] `app/models/apartment_score.py` — модель `ApartmentScore`
-- [ ] Alembic-миграция
-- [ ] `app/repositories/score_repo.py` — upsert по `apartment_id`
-- [ ] Уникальный индекс на `apartment_id`
-- [ ] Поля: grade, score, discount_pct, roi_pct, owner_probability, calculated_at
+- [x] `app/models/apartment_score.py` — модель `ApartmentScore`
+- [x] Alembic-миграция
+- [x] `app/repositories/score_repo.py` — upsert по `apartment_id`
+- [x] Уникальный индекс на `apartment_id`
+- [x] Поля: grade, score, discount_pct, roi_pct, owner_probability, calculated_at
+- [x] `app/analyzer/scoring_service.py` — `score_apartment`, `score_all_active`
+- [x] `scoring_job()` в `app/scheduler/jobs.py` (cron 04:00, после analytics опционально)
+- [x] Тесты `tests/test_scoring_service.py`, `tests/test_score_repo.py`, `tests/test_scoring_job.py`
 
 ### Схема
 
@@ -244,10 +247,10 @@ apartment_scores:
 
 ### Чеклист
 
-- [ ] Расширить dataclass `Deal`: `grade`, `score`, `roi_pct`, `recommendation`
-- [ ] `find_deals` подтягивает данные из `apartment_scores` если есть
-- [ ] Уведомления и `/discount` показывают рейтинг и ROI
-- [ ] Сортировка deals: сначала по grade/score, потом discount_pct
+- [x] Расширить dataclass `Deal`: `grade`, `score`, `roi_pct`, `recommendation`
+- [x] `find_deals` подтягивает данные из `apartment_scores` если есть
+- [x] Уведомления и `/discount` показывают рейтинг и ROI
+- [x] Сортировка deals: сначала по grade/score, потом discount_pct
 
 ### Курсор-промпт
 
@@ -274,6 +277,6 @@ apartment_scores:
 ## Критерии приёмки эпика
 
 - [ ] У каждого активного объявления может быть запись в `apartment_scores`
-- [ ] `/discount` показывает рейтинг A+–D и ROI
+- [x] `/discount` показывает рейтинг A+–D и ROI
 - [ ] `sellers.owner_probability` заполняется при парсинге
 - [ ] Rule-based скоринг покрыт тестами без ML-зависимостей

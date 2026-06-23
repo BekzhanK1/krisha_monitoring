@@ -16,12 +16,100 @@ async def get_by_external_id(session: AsyncSession, external_id: str) -> Apartme
     return result.scalar_one_or_none()
 
 
-async def get_active_by_complex(session: AsyncSession, complex_id: int) -> list[Apartment]:
+async def get_all_active(
+    session: AsyncSession,
+    *,
+    valid_external_id_only: bool = True,
+) -> list[Apartment]:
+    stmt = select(Apartment).where(Apartment.is_active.is_(True))
+    if valid_external_id_only:
+        stmt = stmt.where(Apartment.external_id.regexp_match("^[0-9]+$"))
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_active_by_complex(
+    session: AsyncSession,
+    complex_id: int,
+    *,
+    rooms: int | None = None,
+    valid_external_id_only: bool = False,
+) -> list[Apartment]:
+    conditions = [
+        Apartment.complex_id == complex_id,
+        Apartment.is_active.is_(True),
+    ]
+    if valid_external_id_only:
+        conditions.append(Apartment.external_id.regexp_match("^[0-9]+$"))
+    if rooms is not None:
+        conditions.append(Apartment.rooms == rooms)
+    result = await session.execute(select(Apartment).where(*conditions))
+    return list(result.scalars().all())
+
+
+async def get_inactive_by_complex(
+    session: AsyncSession,
+    complex_id: int,
+    *,
+    rooms: int | None = None,
+    valid_external_id_only: bool = True,
+) -> list[Apartment]:
+    conditions = [
+        Apartment.complex_id == complex_id,
+        Apartment.is_active.is_(False),
+    ]
+    if valid_external_id_only:
+        conditions.append(Apartment.external_id.regexp_match("^[0-9]+$"))
+    if rooms is not None:
+        conditions.append(Apartment.rooms == rooms)
+    result = await session.execute(select(Apartment).where(*conditions))
+    return list(result.scalars().all())
+
+
+async def get_inactive_by_district(
+    session: AsyncSession,
+    district: str,
+    *,
+    rooms: int | None = None,
+) -> list[Apartment]:
+    conditions = [
+        Apartment.district == district,
+        Apartment.is_active.is_(False),
+        Apartment.external_id.regexp_match("^[0-9]+$"),
+    ]
+    if rooms is not None:
+        conditions.append(Apartment.rooms == rooms)
+    result = await session.execute(select(Apartment).where(*conditions))
+    return list(result.scalars().all())
+
+
+async def get_active_by_district(
+    session: AsyncSession,
+    district: str,
+    *,
+    rooms: int | None = None,
+) -> list[Apartment]:
+    conditions = [
+        Apartment.district == district,
+        Apartment.is_active.is_(True),
+        Apartment.external_id.regexp_match("^[0-9]+$"),
+    ]
+    if rooms is not None:
+        conditions.append(Apartment.rooms == rooms)
+    result = await session.execute(select(Apartment).where(*conditions))
+    return list(result.scalars().all())
+
+
+async def get_distinct_active_districts(session: AsyncSession) -> list[str]:
     result = await session.execute(
-        select(Apartment).where(
-            Apartment.complex_id == complex_id,
+        select(Apartment.district)
+        .where(
             Apartment.is_active.is_(True),
-        ),
+            Apartment.external_id.regexp_match("^[0-9]+$"),
+            Apartment.district != "",
+        )
+        .distinct()
+        .order_by(Apartment.district),
     )
     return list(result.scalars().all())
 

@@ -11,7 +11,16 @@ from sqlalchemy.orm import joinedload
 from telegram import Message, Update, User
 
 from app.models import Apartment
-from app.telegram.handlers import cmd_discount, cmd_new, cmd_start, cmd_top
+from app.scraper.filters import SearchFilters
+from app.telegram.handlers import (
+    cmd_discount,
+    cmd_new,
+    cmd_report,
+    cmd_start,
+    cmd_top,
+    cmd_vip,
+    cmd_zhk,
+)
 
 
 def _make_update(user_id: int = 42) -> Update:
@@ -31,7 +40,11 @@ async def test_cmd_start_replies_with_welcome() -> None:
     await cmd_start(update, context)
 
     update.message.reply_text.assert_awaited_once()
-    assert "Krisha Monitor" in update.message.reply_text.await_args.args[0]
+    text = update.message.reply_text.await_args.args[0]
+    assert "Krisha Monitor" in text
+    assert "/zhk" in text
+    assert "/report" in text
+    assert "/vip" in text
 
 
 @pytest.mark.asyncio
@@ -157,3 +170,165 @@ async def test_cmd_top_handles_errors() -> None:
         await cmd_top(update, MagicMock())
 
     update.message.reply_text.assert_awaited_once_with("⚠️ Произошла ошибка")
+
+
+@pytest.mark.asyncio
+async def test_cmd_zhk_top_list() -> None:
+    update = _make_update()
+    context = MagicMock()
+    context.args = []
+
+    with patch("app.telegram.handlers.AsyncSessionLocal") as session_local:
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        with patch(
+            "app.telegram.handlers.analytics_repo.get_top_complexes_by_active_count",
+            AsyncMock(return_value=[("EXPO Residence", 42), ("Green City", 30)]),
+        ):
+            await cmd_zhk(update, context)
+
+    reply_text = update.message.reply_text.await_args.args[0]
+    assert "EXPO Residence" in reply_text
+    assert "42" in reply_text
+    assert update.message.reply_text.await_args.kwargs.get("parse_mode") == "HTML"
+
+
+@pytest.mark.asyncio
+async def test_cmd_zhk_search_shows_snapshot() -> None:
+    from app.models.analytics import MarketAnalytics
+
+    update = _make_update()
+    context = MagicMock()
+    context.args = ["EXPO"]
+
+    complex_mock = MagicMock()
+    complex_mock.id = 1
+    complex_mock.name = "EXPO Residence"
+    snapshot = MarketAnalytics(
+        complex_id=1,
+        median_price=28_000_000,
+        avg_price=29_000_000,
+        median_price_per_sqm=580_000,
+        avg_price_per_sqm=590_000.0,
+        active_count=42,
+        sold_last_30d=8,
+        avg_days_on_market=45.0,
+    )
+
+    with patch("app.telegram.handlers.AsyncSessionLocal") as session_local:
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch(
+                "app.telegram.handlers.complex_repo.search_by_name",
+                AsyncMock(return_value=[complex_mock]),
+            ),
+            patch(
+                "app.telegram.handlers.analytics_repo.get_latest_by_complex",
+                AsyncMock(return_value=snapshot),
+            ),
+        ):
+            await cmd_zhk(update, context)
+
+    reply_text = update.message.reply_text.await_args.args[0]
+    assert "EXPO Residence" in reply_text
+    assert "42" in reply_text
+    assert "8" in reply_text
+
+
+@pytest.mark.asyncio
+async def test_cmd_zhk_multiple_matches_asks_to_clarify() -> None:
+    update = _make_update()
+    context = MagicMock()
+    context.args = ["Green"]
+
+    matches = [MagicMock(), MagicMock()]
+    matches[0].name = "Green City"
+    matches[1].name = "Green Park"
+
+    with patch("app.telegram.handlers.AsyncSessionLocal") as session_local:
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        with patch(
+            "app.telegram.handlers.complex_repo.search_by_name",
+            AsyncMock(return_value=matches),
+        ):
+            await cmd_zhk(update, context)
+
+    reply_text = update.message.reply_text.await_args.args[0]
+    assert "Найдено несколько ЖК" in reply_text
+
+
+@pytest.mark.asyncio
+async def test_cmd_report_uses_days_arg() -> None:
+    update = _make_update()
+    context = MagicMock()
+    context.args = ["14"]
+
+    with patch("app.telegram.handlers.AsyncSessionLocal") as session_local:
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        with patch(
+            "app.telegram.handlers.build_market_report",
+            AsyncMock(return_value="<b>report</b>"),
+        ) as build_report:
+            await cmd_report(update, context)
+
+    build_report.assert_awaited_once_with(mock_session, days=14)
+    update.message.reply_text.assert_awaited_once_with("<b>report</b>", parse_mode="HTML")
+
+
+@pytest.mark.asyncio
+async def test_cmd_vip_uses_score_repo() -> None:
+    update = _make_update()
+    context = MagicMock()
+    context.args = []
+
+    with patch("app.telegram.handlers.AsyncSessionLocal") as session_local:
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch(
+                "app.telegram.handlers._get_active_filters",
+                AsyncMock(return_value=SearchFilters()),
+            ),
+            patch("app.telegram.handlers.score_repo.has_scores", AsyncMock(return_value=True)),
+            patch(
+                "app.telegram.handlers.score_repo.get_vip_apartments",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            await cmd_vip(update, context)
+
+    update.message.reply_text.assert_awaited_once_with("Пока нет данных")
+
+
+@pytest.mark.asyncio
+async def test_cmd_vip_fallback_to_deal_analyzer() -> None:
+    update = _make_update()
+    context = MagicMock()
+    context.args = []
+
+    with (
+        patch("app.telegram.handlers.AsyncSessionLocal") as session_local,
+        patch("app.telegram.handlers.DealAnalyzer") as analyzer_cls,
+        patch(
+            "app.telegram.handlers._get_active_filters",
+            AsyncMock(return_value=SearchFilters()),
+        ),
+        patch("app.telegram.handlers.score_repo.has_scores", AsyncMock(return_value=False)),
+    ):
+        mock_session = AsyncMock()
+        session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        analyzer = analyzer_cls.return_value
+        analyzer.analyze_all_complexes = AsyncMock(return_value=[])
+        await cmd_vip(update, context)
+
+    analyzer.analyze_all_complexes.assert_awaited_once()
+    update.message.reply_text.assert_awaited_once_with("Пока нет данных")

@@ -9,6 +9,10 @@ from app.models.search_config import SearchConfig
 
 DEFAULT_CONFIG_NAME = "default"
 
+EDITABLE_FIELDS = frozenset(
+    {"price_to", "rooms", "area_from", "area_to", "text"},
+)
+
 
 async def get_active_configs(session: AsyncSession) -> list[SearchConfig]:
     result = await session.execute(
@@ -85,5 +89,31 @@ async def update_config(
             value = value.strip() or None
         setattr(config, field, value)
 
+    await session.flush()
+    return config
+
+
+async def update_field(
+    session: AsyncSession,
+    config_id: int,
+    field: str,
+    value: Any,
+) -> SearchConfig:
+    if field not in EDITABLE_FIELDS:
+        msg = f"Field {field!r} is not editable"
+        raise ValueError(msg)
+
+    result = await session.execute(
+        select(SearchConfig).where(SearchConfig.id == config_id),
+    )
+    config = result.scalar_one_or_none()
+    if config is None:
+        msg = f"SearchConfig id={config_id} not found"
+        raise ValueError(msg)
+
+    if field == "text" and isinstance(value, str):
+        value = value.strip() or None
+
+    setattr(config, field, value)
     await session.flush()
     return config

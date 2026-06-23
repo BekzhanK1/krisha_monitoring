@@ -17,7 +17,11 @@ async def db_session() -> AsyncIterator[AsyncSession]:
     )
     async with engine.connect() as connection:
         async with connection.begin() as transaction:
-            session = AsyncSession(bind=connection, expire_on_commit=False)
+            session = AsyncSession(
+                bind=connection,
+                expire_on_commit=False,
+                join_transaction_mode="create_savepoint",
+            )
             yield session
             await session.close()
             await transaction.rollback()

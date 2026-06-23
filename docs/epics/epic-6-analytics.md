@@ -14,11 +14,11 @@
 
 | # | Задача | Статус |
 |---|---|---|
-| 6.1 | [Таблица `analytics`](#задача-61--таблица-analytics) | 🔲 |
-| 6.2 | [Сервис расчёта рыночной статистики](#задача-62--сервис-расчёта-рыночной-статистики) | 🔲 |
-| 6.3 | [Скорость продажи](#задача-63--скорость-продажи) | 🔲 |
-| 6.4 | [Джоба пересчёта аналитики](#задача-64--джоба-пересчёта-аналитики) | 🔲 |
-| 6.5 | [Рефакторинг DealAnalyzer](#задача-65--рефакторинг-dealanalyzer) | 🔲 |
+| 6.1 | [Таблица `analytics`](#задача-61--таблица-analytics) | ✅ |
+| 6.2 | [Сервис расчёта рыночной статистики](#задача-62--сервис-расчёта-рыночной-статистики) | ✅ |
+| 6.3 | [Скорость продажи](#задача-63--скорость-продажи) | ✅ |
+| 6.4 | [Джоба пересчёта аналитики](#задача-64--джоба-пересчёта-аналитики) | ✅ |
+| 6.5 | [Рефакторинг DealAnalyzer](#задача-65--рефакторинг-dealanalyzer) | ✅ |
 
 ---
 
@@ -28,10 +28,10 @@
 
 ### Чеклист
 
-- [ ] `app/models/analytics.py` — модель `MarketAnalytics`
-- [ ] Alembic-миграция `analytics`
-- [ ] Индексы: `(complex_id, calculated_at)`, `(district, calculated_at)`
-- [ ] Модель экспортирована в `app/models/__init__.py`
+- [x] `app/models/analytics.py` — модель `MarketAnalytics`
+- [x] Alembic-миграция `analytics`
+- [x] Индексы: `(complex_id, calculated_at)`, `(district, calculated_at)`
+- [x] Модель экспортирована в `app/models/__init__.py`
 
 ### Схема
 
@@ -87,12 +87,12 @@ analytics:
 
 ### Чеклист
 
-- [ ] `app/analyzer/market_analytics.py` — класс `MarketAnalyticsService`
-- [ ] Метод `compute_complex_stats(complex_id, rooms=None) -> MarketStats`
-- [ ] Метод `compute_district_stats(district, rooms=None) -> MarketStats`
-- [ ] Минимум 5 активных объявлений для расчёта (как в `DealAnalyzer`)
-- [ ] Сохранение снимка через `analytics_repo.save_snapshot`
-- [ ] Unit-тесты на расчёт медиан
+- [x] `app/analyzer/market_analytics.py` — класс `MarketAnalyticsService`
+- [x] Метод `compute_complex_stats(complex_id, rooms=None) -> MarketStats`
+- [x] Метод `compute_district_stats(district, rooms=None) -> MarketStats`
+- [x] Минимум 5 активных объявлений для расчёта (как в `DealAnalyzer`)
+- [x] Сохранение снимка через `analytics_repo.save_snapshot`
+- [x] Unit-тесты на расчёт медиан
 
 ### Курсор-промпт
 
@@ -131,11 +131,11 @@ async def compute_and_save_districts(self) -> int:
 
 ### Чеклист
 
-- [ ] Метод `compute_sale_velocity(complex_id) -> SaleVelocity`
-- [ ] `sold_last_30d` — объявления, ставшие inactive за 30 дней
-- [ ] `avg_days_on_market` — среднее `(last_seen_at - first_seen_at)` для снятых
-- [ ] Поля записываются в снимок `analytics`
-- [ ] Тесты на fixture-данных status_history
+- [x] Метод `compute_sale_velocity(complex_id) -> SaleVelocity`
+- [x] `sold_last_30d` — объявления, ставшие inactive за 30 дней
+- [x] `avg_days_on_market` — среднее `(last_seen_at - first_seen_at)` для снятых
+- [x] Поля записываются в снимок `analytics`
+- [x] Тесты на fixture-данных status_history
 
 ### Метрики
 
@@ -176,11 +176,11 @@ class SaleVelocity:
 
 ### Чеклист
 
-- [ ] `app/scheduler/jobs.py` — `analytics_job()`
-- [ ] Расписание: 1 раз в сутки (ночь) + опционально после `scrape_job`
-- [ ] Guard от параллельного запуска (как у `scrape_job`)
-- [ ] Логирование: сколько ЖК/районов пересчитано
-- [ ] `GET /scheduler/status` — показать last run analytics
+- [x] `app/scheduler/jobs.py` — `analytics_job()`
+- [x] Расписание: 1 раз в сутки (ночь) + опционально после `scrape_job`
+- [x] Guard от параллельного запуска (как у `scrape_job`)
+- [x] Логирование: сколько ЖК/районов пересчитано
+- [x] `GET /scheduler/status` — показать last run analytics
 
 ### Курсор-промпт
 
@@ -209,10 +209,10 @@ class SaleVelocity:
 
 ### Чеклист
 
-- [ ] `get_market_stats()` — сначала `analytics_repo.get_latest_by_complex`, fallback на live-расчёт
-- [ ] Убрать или сократить in-memory `_stats_cache` (оставить только как L1 на 5 мин)
-- [ ] `/discount` и уведомления работают без регрессий
-- [ ] Обновить тесты `test_deal_analyzer.py`
+- [x] `get_market_stats()` — сначала `analytics_repo.get_latest_by_complex`, fallback на live-расчёт
+- [x] Убрать или сократить in-memory `_stats_cache` (оставить только как L1 на 5 мин)
+- [x] `/discount` и уведомления работают без регрессий
+- [x] Обновить тесты `test_deal_analyzer.py`
 
 ### Курсор-промпт
 
@@ -234,7 +234,7 @@ class SaleVelocity:
 
 ## Критерии приёмки эпика
 
-- [ ] В БД появляются ежедневные срезы по каждому ЖК с ≥5 активными объявлениями
-- [ ] Для ЖК доступны `sold_last_30d` и `avg_days_on_market`
-- [ ] `DealAnalyzer` использует сохранённую аналитику
-- [ ] Все тесты проходят, ruff/mypy чистые
+- [x] В БД появляются ежедневные срезы по каждому ЖК с ≥5 активными объявлениями
+- [x] Для ЖК доступны `sold_last_30d` и `avg_days_on_market`
+- [x] `DealAnalyzer` использует сохранённую аналитику
+- [x] Все тесты проходят, ruff/mypy чистые

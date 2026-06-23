@@ -10,6 +10,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analyzer.seller_scorer import estimate_owner_probability
 from app.config import Settings, get_settings
 from app.models import Seller, SellerType
 from app.repositories import apartment_repo, complex_repo, search_config_repo
@@ -203,6 +204,7 @@ class ScrapeService:
         seller_name = parsed.get("seller_name")
         seller_phone = parsed.get("seller_phone")
         seller_type_raw = parsed.get("seller_type")
+        description = parsed.get("description")
         if not seller_name and not seller_phone and not seller_type_raw:
             return
 
@@ -211,16 +213,25 @@ class ScrapeService:
         )
         seller = result.scalar_one_or_none()
         seller_type = SellerType(str(seller_type_raw)) if isinstance(seller_type_raw, str) else None
+        name_str = str(seller_name) if isinstance(seller_name, str) else None
+        description_str = str(description) if isinstance(description, str) else None
+        owner_probability = estimate_owner_probability(
+            seller_type=seller_type,
+            description=description_str,
+            seller_name=name_str,
+        )
 
         if seller is None:
             self._session.add(
                 Seller(
                     apartment_id=apartment_id,
-                    name=str(seller_name) if isinstance(seller_name, str) else None,
+                    name=name_str,
                     phone=str(seller_phone) if isinstance(seller_phone, str) else None,
                     seller_type=seller_type,
+                    owner_probability=owner_probability,
                 ),
             )
+            await self._session.flush()
             return
 
         if isinstance(seller_name, str):
@@ -229,3 +240,5 @@ class ScrapeService:
             seller.phone = seller_phone
         if seller_type is not None:
             seller.seller_type = seller_type
+        seller.owner_probability = owner_probability
+        await self._session.flush()

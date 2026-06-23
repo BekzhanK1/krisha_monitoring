@@ -11,8 +11,8 @@
 | # | Эпик | Задачи | Статус |
 |---|---|---|---|
 | E6 | [Аналитика рынка](epics/epic-6-analytics.md) | 5 | 🔲 Не начат |
-| E7 | [Скоринг и рейтинг](epics/epic-7-scoring.md) | 5 | 🔲 Не начат |
-| E8 | [Telegram V2 и охотник](epics/epic-8-telegram-v2.md) | 6 | 🔲 Не начат |
+| E7 | [Скоринг и рейтинг](epics/epic-7-scoring.md) | 5 | ✅ Завершён |
+| E8 | [Telegram V2 и охотник](epics/epic-8-telegram-v2.md) | 6 | ✅ Завершён |
 
 **Итого: 16 задач**
 

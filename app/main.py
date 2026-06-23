@@ -9,7 +9,14 @@ from telegram.ext import Application
 
 from app.config import get_settings
 from app.logging_config import setup_logging
-from app.scheduler.jobs import scrape_job
+from app.scheduler.hunter_job import get_hunter_job_status, hunter_job
+from app.scheduler.jobs import (
+    analytics_job,
+    get_analytics_job_status,
+    get_scoring_job_status,
+    scoring_job,
+    scrape_job,
+)
 from app.scheduler.scheduler import get_scheduler
 
 
@@ -23,12 +30,37 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     settings = get_settings()
     scheduler = get_scheduler()
+    from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
 
     scheduler.add_job(
         scrape_job,
         trigger=IntervalTrigger(minutes=settings.parser_interval_minutes),
         id="scrape_all",
+        replace_existing=True,
+        misfire_grace_time=60,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        analytics_job,
+        trigger=CronTrigger(hour=3, minute=0),
+        id="analytics_daily",
+        replace_existing=True,
+        misfire_grace_time=300,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        scoring_job,
+        trigger=CronTrigger(hour=4, minute=0),
+        id="scoring_daily",
+        replace_existing=True,
+        misfire_grace_time=300,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        hunter_job,
+        trigger=IntervalTrigger(minutes=settings.hunter_interval_minutes),
+        id="hunter",
         replace_existing=True,
         misfire_grace_time=60,
         coalesce=True,
@@ -88,4 +120,10 @@ async def scheduler_status() -> dict[str, object]:
                 "trigger": str(job.trigger),
             },
         )
-    return {"running": scheduler.running, "jobs": jobs}
+    return {
+        "running": scheduler.running,
+        "jobs": jobs,
+        "analytics": get_analytics_job_status(),
+        "scoring": get_scoring_job_status(),
+        "hunter": get_hunter_job_status(),
+    }

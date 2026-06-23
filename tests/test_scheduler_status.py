@@ -11,6 +11,8 @@ def test_scheduler_status_has_expected_fields() -> None:
 
     assert "running" in data
     assert "jobs" in data
+    assert "analytics" in data
+    assert "hunter" in data
     assert isinstance(data["running"], bool)
     assert isinstance(data["jobs"], list)
 

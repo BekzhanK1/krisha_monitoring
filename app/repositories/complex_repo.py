@@ -25,3 +25,19 @@ async def get_or_create(
 async def get_all(session: AsyncSession) -> list[ResidentialComplex]:
     result = await session.execute(select(ResidentialComplex).order_by(ResidentialComplex.name))
     return list(result.scalars().all())
+
+
+async def get_by_id(session: AsyncSession, complex_id: int) -> ResidentialComplex | None:
+    result = await session.execute(
+        select(ResidentialComplex).where(ResidentialComplex.id == complex_id),
+    )
+    return result.scalar_one_or_none()
+
+
+async def search_by_name(session: AsyncSession, query: str) -> list[ResidentialComplex]:
+    result = await session.execute(
+        select(ResidentialComplex)
+        .where(ResidentialComplex.name.ilike(f"%{query}%"))
+        .order_by(ResidentialComplex.name),
+    )
+    return list(result.scalars().all())

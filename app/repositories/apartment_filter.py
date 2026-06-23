@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +12,10 @@ from app.scraper.filters import SearchFilters
 from app.scraper.urls import is_valid_listing_id
 
 
-def apply_search_filters(
-    stmt: Select[tuple[Apartment]],
+def apply_search_filters[T: tuple[Any, ...]](
+    stmt: Select[T],
     filters: SearchFilters,
-) -> Select[tuple[Apartment]]:
+) -> Select[T]:
     if filters.rooms is not None:
         stmt = stmt.where(Apartment.rooms == filters.rooms)
     if filters.price_from is not None:
@@ -48,6 +49,7 @@ async def get_filtered_apartments(
     *,
     limit: int = 10,
     recent_hours: int | None = None,
+    recent_minutes: int | None = None,
 ) -> list[Apartment]:
     stmt = (
         select(Apartment)
@@ -58,7 +60,12 @@ async def get_filtered_apartments(
         )
     )
     stmt = apply_search_filters(stmt, filters)
-    if recent_hours is not None:
+    if recent_minutes is not None:
+        cutoff = datetime.now(UTC) - timedelta(minutes=recent_minutes)
+        stmt = stmt.where(Apartment.first_seen_at > cutoff).order_by(
+            Apartment.first_seen_at.desc(),
+        )
+    elif recent_hours is not None:
         cutoff = datetime.now(UTC) - timedelta(hours=recent_hours)
         stmt = stmt.where(Apartment.first_seen_at > cutoff).order_by(
             Apartment.first_seen_at.desc(),
