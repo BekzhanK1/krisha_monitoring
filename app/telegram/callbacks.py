@@ -19,6 +19,7 @@ from app.repositories.search_config_repo import get_active_configs, get_or_creat
 from app.scraper.filters import SearchFilters
 from app.scraper.urls import is_valid_listing_id
 from app.telegram.cache import apartment_list_cache
+from app.telegram.filter_editor import handle_filter_callback
 from app.telegram.keyboards import (
     back_to_menu_keyboard,
     listing_detail_keyboard,
@@ -304,6 +305,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     try:
         async with AsyncSessionLocal() as session:
+            # Filter editor callbacks — handle first
+            if data.startswith(("fmenu", "ffield:", "fset:", "fclear:", "ftext", "fstep:")):
+                handled = await handle_filter_callback(update, context)
+                if handled:
+                    return
+
             # Menu button
             if MENU_PATTERN.match(data):
                 await query.answer()
@@ -324,7 +331,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 cmd = cmd_match.group(1)
                 if cmd == "settings":
                     await query.answer()
-                    await reply_settings_overview(update, session)
+                    from app.telegram.filter_editor import _send_filter_editor
+
+                    await _send_filter_editor(update, session)
                     return
                 if cmd == "favorites":
                     await _send_favorites(update, session, page=1)

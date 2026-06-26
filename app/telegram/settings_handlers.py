@@ -149,6 +149,33 @@ async def callback_settings_edit(update: Update, context: ContextTypes.DEFAULT_T
 
 async def handle_settings_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_data = _user_data(context)
+
+    # Handle filter text input from the inline filter editor
+    if user_data.get("filter_text_input"):
+        user_data.pop("filter_text_input", None)
+        message = update.message
+        if message is None or message.text is None:
+            return
+        text_value = message.text.strip()
+        try:
+            async with AsyncSessionLocal() as session:
+                from app.telegram.filter_editor import _get_config, _send_filter_editor
+                from app.telegram.cache import apartment_list_cache
+
+                config = await _get_config(session)
+                if text_value == "-" or not text_value:
+                    await update_field(session, config.id, "text", None)
+                else:
+                    await update_field(session, config.id, "text", text_value)
+                await session.commit()
+                await apartment_list_cache.clear()
+                await _send_filter_editor(update, session)
+        except Exception:
+            logger.exception("Error saving filter text input")
+            if message is not None:
+                await message.reply_text(ERROR_MESSAGE)
+        return
+
     edit_state = user_data.get(SETTINGS_EDIT_KEY)
     if not isinstance(edit_state, dict):
         return

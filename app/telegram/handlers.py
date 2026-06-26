@@ -265,7 +265,9 @@ async def cmd_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     async def work(session: AsyncSession) -> None:
-        await reply_settings_overview(update, session)
+        from app.telegram.filter_editor import _send_filter_editor
+
+        await _send_filter_editor(update, session)
 
     await _with_session("settings", update, work)
 
