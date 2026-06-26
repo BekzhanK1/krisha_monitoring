@@ -156,18 +156,23 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     user_id = user.id if user is not None else "unknown"
     logger.info("Telegram command /start from user_id={}", user_id)
+
+    # Register/update the user in the database
+    from app.telegram.callbacks import _get_or_create_user
+
+    async with AsyncSessionLocal() as session:
+        await _get_or_create_user(update, session)
+        await session.commit()
+
+    from app.telegram.keyboards import main_menu_keyboard
+
     await update.message.reply_text(
-        "Krisha Monitor запущен\n\n"
-        "Команды:\n"
-        "/filter — по текущим настройкам\n"
-        "/fnew — новые за 24ч по настройкам\n"
-        "/top — все активные (без фильтра)\n"
-        "/new — все новые за 24ч\n"
-        "/discount — выгодные сделки\n"
-        "/zhk — статистика по ЖК\n"
-        "/report — сводный отчёт по рынку\n"
-        "/vip — топ инвестиционных объектов\n"
-        "/settings — настройки поиска (редактирование кнопками)",
+        "🏠 <b>Krisha Monitor</b>\n\n"
+        "Добро пожаловать! Выберите раздел в меню ниже:\n\n"
+        "💡 Вы можете использовать как кнопки, так и команды:\n"
+        "/filter, /fnew, /top, /new, /discount, /zhk, /report, /vip, /settings, /favorites",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -366,3 +371,27 @@ async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _reply_with_cards(update, cards)
 
     await _with_session("vip", update, work)
+
+
+async def cmd_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show the user's favorited apartments as an inline-keyboard list."""
+    from app.telegram.callbacks import _get_or_create_user, _send_favorites
+
+    async def work(session: AsyncSession) -> None:
+        await _get_or_create_user(update, session)
+        await _send_favorites(update, session, page=1)
+
+    await _with_session("favorites", update, work)
+
+
+async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show the main inline menu."""
+    if update.message is None:
+        return
+    from app.telegram.keyboards import main_menu_keyboard
+
+    await update.message.reply_text(
+        "🏠 <b>Главное меню</b>\n\nВыберите раздел:",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )

@@ -4,6 +4,7 @@ from typing import Any
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.models import Apartment, ApartmentStatus, ApartmentStatusHistory
 from app.repositories.price_repo import record_price_change
@@ -231,3 +232,18 @@ async def mark_inactive(
     logger.info("Marked {} apartments as inactive in {}", len(marked), label)
     # TODO (Epic 5): send Telegram notifications for watchlist apartments in `marked`
     return marked
+
+
+async def get_by_id_with_details(session: AsyncSession, apartment_id: int) -> Apartment | None:
+    """Get a single apartment by ID with complex and price history eagerly loaded."""
+    from sqlalchemy.orm import selectinload
+
+    result = await session.execute(
+        select(Apartment)
+        .options(
+            joinedload(Apartment.complex),
+            selectinload(Apartment.prices),
+        )
+        .where(Apartment.id == apartment_id),
+    )
+    return result.scalars().unique().one_or_none()

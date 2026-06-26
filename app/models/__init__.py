@@ -7,6 +7,7 @@ from app.models.residential_complex import ResidentialComplex
 from app.models.search_config import SearchConfig
 from app.models.seller import Seller, SellerType
 from app.models.status_history import ApartmentStatus, ApartmentStatusHistory
+from app.models.telegram import Favorite, TelegramUser
 
 __all__ = [
     "MarketAnalytics",
@@ -15,9 +16,11 @@ __all__ = [
     "ApartmentPrice",
     "ApartmentStatus",
     "ApartmentStatusHistory",
+    "Favorite",
     "Notification",
     "ResidentialComplex",
     "SearchConfig",
     "Seller",
     "SellerType",
+    "TelegramUser",
 ]
