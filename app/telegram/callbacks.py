@@ -306,7 +306,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         async with AsyncSessionLocal() as session:
             # Filter editor callbacks — handle first
-            if data.startswith(("fmenu", "ffield:", "fset:", "fclear:", "ftext", "fstep:")):
+            if data.startswith(("fmenu", "ffield:", "fset:", "fclear:", "ftext", "fstep:", "fcomplex:")):
                 handled = await handle_filter_callback(update, context)
                 if handled:
                     return

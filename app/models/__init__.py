@@ -5,6 +5,7 @@ from app.models.notification import Notification
 from app.models.price_history import ApartmentPrice
 from app.models.residential_complex import ResidentialComplex
 from app.models.search_config import SearchConfig
+from app.models.search_config_complex import SearchConfigComplex
 from app.models.seller import Seller, SellerType
 from app.models.status_history import ApartmentStatus, ApartmentStatusHistory
 from app.models.telegram import Favorite, TelegramUser
@@ -20,6 +21,7 @@ __all__ = [
     "Notification",
     "ResidentialComplex",
     "SearchConfig",
+    "SearchConfigComplex",
     "Seller",
     "SellerType",
     "TelegramUser",

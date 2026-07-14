@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     run_analytics_after_scrape: bool = True
     run_scoring_after_analytics: bool = True
     scraper_max_listings: int | None = None
+    scraper_detail_concurrency: int = 8
+    scraper_complex_concurrency: int = 3
     renovation_per_sqm: int = 150_000
     transaction_fee_pct: float = 0.01
     capital_gains_tax_pct: float = 0.10

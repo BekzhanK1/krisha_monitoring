@@ -17,6 +17,7 @@ from app.models import (  # noqa: F401
     Notification,
     ResidentialComplex,
     SearchConfig,
+    SearchConfigComplex,
     Seller,
 )
 

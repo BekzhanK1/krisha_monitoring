@@ -19,8 +19,11 @@ from telegram.ext import ContextTypes
 
 from app.database import AsyncSessionLocal
 from app.models.search_config import SearchConfig
-from app.repositories.search_config_repo import get_active_configs, get_or_create_default, update_field
-from app.scraper.filters import SearchFilters
+from app.repositories.search_config_repo import (
+    get_active_configs,
+    get_or_create_default,
+    update_field,
+)
 from app.telegram.notifications import format_price
 
 # Callback data patterns
@@ -29,6 +32,8 @@ FILTER_FIELD_PATTERN = re.compile(r"^ffield:([a-z_]+)$")
 FILTER_SET_PATTERN = re.compile(r"^fset:([a-z_]+):(.+)$")
 FILTER_CLEAR_PATTERN = re.compile(r"^fclear:([a-z_]+)$")
 FILTER_TEXT_PATTERN = re.compile(r"^ftext$")
+FILTER_COMPLEX_ADD_PATTERN = re.compile(r"^fcomplex:add$")
+FILTER_COMPLEX_DEL_PATTERN = re.compile(r"^fcomplex:del:(\d+)$")
 
 # All editable filter fields with their display labels
 FILTER_FIELDS: dict[str, str] = {
@@ -80,9 +85,26 @@ def format_filter_editor_message(config: SearchConfig) -> str:
     for field, label in FILTER_FIELDS.items():
         value = _format_field_value(config, field)
         lines.append(f"{label}: <b>{value}</b>")
+
+    complexes = list(getattr(config, "complexes", []) or [])
+    if complexes:
+        lines.append("")
+        lines.append(f"🏘 <b>ЖК ({len(complexes)})</b> — парсер обходит каждый:")
+        for item in complexes:
+            label = (
+                item.name.strip()
+                if item.name and item.name.strip()
+                else item.krisha_complex_id
+            )
+            cid = html.escape(item.krisha_complex_id)
+            lines.append(f"  • {html.escape(label)} (<code>{cid}</code>)")
+    else:
+        lines.append("")
+        lines.append("🏘 <b>ЖК:</b> все (без фильтра по комплексу)")
+
     lines.append("")
     lines.append("Нажмите на поле, чтобы изменить его.")
-    lines.append("💡 Текст: отправьте «-» для сброса.")
+    lines.append("💡 Текст / ЖК: отправьте «-» для сброса.")
     return "\n".join(lines)
 
 
@@ -119,6 +141,20 @@ def build_filter_editor_keyboard(config: SearchConfig) -> InlineKeyboardMarkup:
         InlineKeyboardButton(f"📝 Текст: {text_value}", callback_data="ftext"),
     ])
 
+    # Complexes
+    keyboard.append([
+        InlineKeyboardButton("➕ Добавить ЖК", callback_data="fcomplex:add"),
+    ])
+    for item in getattr(config, "complexes", []) or []:
+        label = item.name.strip() if item.name and item.name.strip() else item.krisha_complex_id
+        short = label if len(label) <= 24 else f"{label[:21]}…"
+        keyboard.append([
+            InlineKeyboardButton(
+                f"🗑 {short}",
+                callback_data=f"fcomplex:del:{item.krisha_complex_id}",
+            ),
+        ])
+
     # Navigation
     keyboard.append([
         InlineKeyboardButton("🔍 Применить фильтр", callback_data="cmd:filter"),
@@ -149,7 +185,9 @@ def build_stepper_keyboard(
     preset_buttons: list[InlineKeyboardButton] = []
     for val in presets:
         if min_val <= val <= max_val:
-            label = f"{'✅' if current == val else ''}{int(val) if isinstance(val, int) or val == int(val) else val}"
+            check = "✅" if current == val else ""
+            display = int(val) if isinstance(val, int) or val == int(val) else val
+            label = f"{check}{display}"
             preset_buttons.append(
                 InlineKeyboardButton(label, callback_data=f"fset:{field}:{val}"),
             )
@@ -158,26 +196,33 @@ def build_stepper_keyboard(
         keyboard.append(preset_buttons[i : i + 3])
 
     # +/- stepper
+    step_label = int(step) if step == int(step) else step
     stepper_row: list[InlineKeyboardButton] = []
     if current is not None:
         new_minus = current - step
         if new_minus >= min_val:
             stepper_row.append(
-                InlineKeyboardButton(f"➖ {int(step) if step == int(step) else step}", callback_data=f"fstep:{field}:{new_minus}"),
+                InlineKeyboardButton(
+                    f"➖ {step_label}",
+                    callback_data=f"fstep:{field}:{new_minus}",
+                ),
             )
     stepper_row.append(InlineKeyboardButton("⬆️ Назад к фильтру", callback_data="fmenu"))
     if current is not None:
         new_plus = current + step
         if new_plus <= max_val:
             stepper_row.append(
-                InlineKeyboardButton(f"➕ {int(step) if step == int(step) else step}", callback_data=f"fstep:{field}:{new_plus}"),
+                InlineKeyboardButton(
+                    f"➕ {step_label}",
+                    callback_data=f"fstep:{field}:{new_plus}",
+                ),
             )
     keyboard.append(stepper_row)
 
     # Clear button
     if current is not None:
         keyboard.append([
-            InlineKeyboardButton(f"❌ Сбросить", callback_data=f"fclear:{field}"),
+            InlineKeyboardButton("❌ Сбросить", callback_data=f"fclear:{field}"),
         ])
 
     keyboard.append([InlineKeyboardButton("🏠 В меню", callback_data="menu")])
@@ -212,7 +257,13 @@ async def _send_stepper(update: Update, session: AsyncSession, field: str) -> No
     if query is None:
         return
     config = await _get_config(session)
-    text = f"⚙️ <b>{html.escape(FILTER_FIELDS[field])}</b>\n\nТекущее: <b>{_format_field_value(config, field)}</b>\n\nВыберите значение или используйте +/-:"
+    field_title = html.escape(FILTER_FIELDS[field])
+    current_value = _format_field_value(config, field)
+    text = (
+        f"⚙️ <b>{field_title}</b>\n\n"
+        f"Текущее: <b>{current_value}</b>\n\n"
+        "Выберите значение или используйте +/-:"
+    )
     keyboard = build_stepper_keyboard(field, config)
     await query.answer()
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
@@ -230,18 +281,6 @@ async def _set_field(
         return
 
     config = await _get_config(session)
-
-    # Parse the value
-    if field == "rooms":
-        value: object = int(raw_value)
-    elif field in {"price_from", "price_to"}:
-        value = int(float(raw_value))
-    elif field in {"area_from", "area_to"}:
-        value = float(raw_value)
-    elif field in {"floor_from", "floor_to"}:
-        value = int(float(raw_value))
-    else:
-        value = raw_value
 
     # Validate using existing validation
     from app.telegram.settings_validation import validate_field_value
@@ -303,6 +342,44 @@ async def _handle_text_input_start(update: Update, context: ContextTypes.DEFAULT
     context.user_data["filter_text_input"] = True
 
 
+async def _handle_complex_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+    await query.answer()
+    config_id: int | None = None
+    async with AsyncSessionLocal() as session:
+        config = await _get_config(session)
+        config_id = config.id
+    if context.user_data is None:
+        context.user_data = {}
+    context.user_data["filter_complex_input"] = {"config_id": config_id}
+    await query.message.reply_text(  # type: ignore[union-attr]
+        "🏘 Введите ID жилого комплекса с Krisha.\n"
+        "Формат: <code>12345</code> или <code>12345|Название ЖК</code>\n\n"
+        "ID из URL: <code>das[map.complex]=…</code>",
+        parse_mode="HTML",
+    )
+
+
+async def _handle_complex_delete(update: Update, session: AsyncSession, krisha_id: str) -> None:
+    from app.repositories import search_config_complex_repo
+    from app.telegram.cache import apartment_list_cache
+
+    query = update.callback_query
+    if query is None:
+        return
+    config = await _get_config(session)
+    removed = await search_config_complex_repo.remove_complex(session, config.id, krisha_id)
+    await session.commit()
+    await apartment_list_cache.clear()
+    if removed:
+        await query.answer("🗑 ЖК удалён")
+    else:
+        await query.answer("ЖК не найден", show_alert=True)
+    await _send_filter_editor(update, session)
+
+
 async def handle_filter_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Handle filter-related callback queries.
 
@@ -322,6 +399,15 @@ async def handle_filter_callback(update: Update, context: ContextTypes.DEFAULT_T
 
             if FILTER_TEXT_PATTERN.match(data):
                 await _handle_text_input_start(update, context)
+                return True
+
+            if FILTER_COMPLEX_ADD_PATTERN.match(data):
+                await _handle_complex_add_start(update, context)
+                return True
+
+            del_match = FILTER_COMPLEX_DEL_PATTERN.match(data)
+            if del_match:
+                await _handle_complex_delete(update, session, del_match.group(1))
                 return True
 
             field_match = FILTER_FIELD_PATTERN.match(data)

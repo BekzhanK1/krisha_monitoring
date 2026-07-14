@@ -14,12 +14,17 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-LISTING_LINK_SELECTOR = 'a.a-card__title[href*="/a/show/"]'
-LISTING_LINK_FALLBACK = 'a[href*="/a/show/"]'
+LISTING_LINK_SELECTOR = (
+    "div.a-list a.a-card__title[href*='/a/show/'], "
+    "section.a-list a.a-card__title[href*='/a/show/'], "
+    ".a-search-list a.a-card__title[href*='/a/show/']"
+)
+LISTING_LINK_FALLBACK = "a.a-card__title[href*='/a/show/']"
 NEXT_PAGE_SELECTOR = "a.paginator__btn--next"
+EMPTY_SEARCH_SELECTORS = (".a-search-empty",)
 
 RETRY_DELAYS_SEC = (5, 10, 20)
-PAGE_DELAY_SEC = (1.0, 3.0)
+PAGE_DELAY_SEC = (0.4, 1.2)
 LISTING_ID_PATTERN = re.compile(r"/a/show/(\d+)")
 
 
@@ -113,7 +118,7 @@ class KrishaScraper:
                 if response is not None and response.status >= 400:
                     msg = f"HTTP {response.status} for {url}"
                     raise RuntimeError(msg)
-                await page.wait_for_timeout(1_500)
+                await page.wait_for_timeout(600)
                 return await page.content()
             except Exception as exc:
                 last_error = exc
@@ -134,6 +139,10 @@ class KrishaScraper:
         raise RuntimeError(msg) from last_error
 
     def _extract_listing_urls(self, html: str) -> list[str]:
+        if self._is_empty_search(html):
+            logger.info("Search page has no matches (empty result)")
+            return []
+
         urls = self._extract_hrefs(html, LISTING_LINK_SELECTOR)
         if not urls:
             urls = self._extract_hrefs(html, LISTING_LINK_FALLBACK)
@@ -148,6 +157,16 @@ class KrishaScraper:
             seen.add(listing_id)
             normalized.append(full_url)
         return normalized
+
+    @staticmethod
+    def _is_empty_search(html: str) -> bool:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "lxml")
+        for selector in EMPTY_SEARCH_SELECTORS:
+            if soup.select_one(selector) is not None:
+                return True
+        return False
 
     @staticmethod
     def _extract_hrefs(html: str, selector: str) -> list[str]:

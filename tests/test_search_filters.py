@@ -15,11 +15,13 @@ def test_search_filters_includes_only_set_params() -> None:
         rooms=2,
         price_to=30_000_000,
         text="Срочно",
+        complex_ids=("55",),
     )
-    params = filters.to_query_params()
+    params = filters.to_query_params(complex_id="55")
     assert params["_txt_"] == "Срочно"
     assert params["das[live.rooms]"] == "2"
     assert params["das[price][to]"] == "30000000"
+    assert params["das[map.complex]"] == "55"
     assert "das[flat.floor][from]" not in params
 
 

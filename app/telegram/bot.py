@@ -38,8 +38,10 @@ def register_handlers(application: Application) -> None:  # type: ignore[type-ar
     application.add_handler(CommandHandler("favorites", cmd_favorites))
     application.add_handler(CommandHandler("settings", cmd_settings))
 
-    # Settings inline keyboard editing
-    application.add_handler(CallbackQueryHandler(callback_settings_edit, pattern=r"^edit:\d+:"))
+    # Settings inline keyboard editing (fields + complex list)
+    application.add_handler(
+        CallbackQueryHandler(callback_settings_edit, pattern=r"^(edit:\d+:|cdel:\d+:)"),
+    )
 
     # Main callback router for inline navigation (menu, listings, favorites, etc.)
     # This handler catches all other callback queries not matched by settings.

@@ -38,7 +38,7 @@
 https://krisha.kz/prodazha/kvartiry/astana/?_txt_=Срочно&das[live.rooms]=2&...&page={n}
 ```
 
-Опционально фильтр по ЖК: `das[complex]={complex_id}`
+Опционально фильтр по ЖК: `das[map.complex]={complex_id}`
 
 ---
 

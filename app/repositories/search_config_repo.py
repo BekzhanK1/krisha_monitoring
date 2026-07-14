@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.search_config import SearchConfig
 
@@ -16,14 +17,21 @@ EDITABLE_FIELDS = frozenset(
 
 async def get_active_configs(session: AsyncSession) -> list[SearchConfig]:
     result = await session.execute(
-        select(SearchConfig).where(SearchConfig.is_active.is_(True)).order_by(SearchConfig.id),
+        select(SearchConfig)
+        .options(selectinload(SearchConfig.complexes))
+        .where(SearchConfig.is_active.is_(True))
+        .order_by(SearchConfig.id)
+        .execution_options(populate_existing=True),
     )
-    return list(result.scalars().all())
+    return list(result.scalars().unique().all())
 
 
 async def get_by_name(session: AsyncSession, name: str) -> SearchConfig | None:
     result = await session.execute(
-        select(SearchConfig).where(SearchConfig.name == name),
+        select(SearchConfig)
+        .options(selectinload(SearchConfig.complexes))
+        .where(SearchConfig.name == name)
+        .execution_options(populate_existing=True),
     )
     return result.scalar_one_or_none()
 
@@ -104,7 +112,9 @@ async def update_field(
         raise ValueError(msg)
 
     result = await session.execute(
-        select(SearchConfig).where(SearchConfig.id == config_id),
+        select(SearchConfig)
+        .options(selectinload(SearchConfig.complexes))
+        .where(SearchConfig.id == config_id),
     )
     config = result.scalar_one_or_none()
     if config is None:

@@ -25,14 +25,19 @@ class SearchFilters:
     area_from: float | None = None
     area_to: float | None = None
     text: str | None = None
-    complex_id: str | None = None
+    complex_ids: tuple[str, ...] = ()
 
     @classmethod
     def from_search_config(cls, config: SearchConfig) -> SearchFilters:
         text = config.text.strip() if config.text and config.text.strip() else None
-        complex_id = (
-            config.complex_id.strip() if config.complex_id and config.complex_id.strip() else None
-        )
+        complex_ids: list[str] = []
+        for item in getattr(config, "complexes", []) or []:
+            krisha_id = (item.krisha_complex_id or "").strip()
+            if krisha_id and krisha_id not in complex_ids:
+                complex_ids.append(krisha_id)
+        # Backward compat: legacy single column
+        if not complex_ids and config.complex_id and config.complex_id.strip():
+            complex_ids.append(config.complex_id.strip())
         return cls(
             city=config.city or "astana",
             rooms=config.rooms,
@@ -47,10 +52,10 @@ class SearchFilters:
             area_from=config.area_from,
             area_to=config.area_to,
             text=text,
-            complex_id=complex_id,
+            complex_ids=tuple(complex_ids),
         )
 
-    def to_query_params(self) -> dict[str, str]:
+    def to_query_params(self, *, complex_id: str | None = None) -> dict[str, str]:
         params: dict[str, str] = {}
         if self.text:
             params["_txt_"] = self.text
@@ -76,12 +81,23 @@ class SearchFilters:
             params["das[live.square][from]"] = str(self.area_from)
         if self.area_to is not None:
             params["das[live.square][to]"] = str(self.area_to)
-        if self.complex_id:
-            params["das[complex]"] = self.complex_id
+        if complex_id:
+            params["das[map.complex]"] = complex_id
         return params
 
-    def build_url(self, page: int = 1) -> str:
-        params = self.to_query_params()
+    def build_url(self, page: int = 1, *, complex_id: str | None = None) -> str:
+        """Build one listing URL.
+
+        If ``complex_id`` is omitted and there are multiple complexes,
+        uses the first one (prefer ``build_urls`` / ``iter_search_targets``).
+        """
+        resolved_complex = complex_id
+        if resolved_complex is None and len(self.complex_ids) == 1:
+            resolved_complex = self.complex_ids[0]
+        elif resolved_complex is None and len(self.complex_ids) > 1:
+            resolved_complex = self.complex_ids[0]
+
+        params = self.to_query_params(complex_id=resolved_complex)
         city = self.city or "astana"
         url = f"{BASE_LISTING_URL}/{city}/"
         if params:
@@ -90,6 +106,21 @@ class SearchFilters:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}page={page}"
         return url
+
+    def build_urls(self, page: int = 1) -> list[str]:
+        """One URL per complex; if none — a single URL without complex filter."""
+        if not self.complex_ids:
+            return [self.build_url(page=page, complex_id=None)]
+        return [self.build_url(page=page, complex_id=cid) for cid in self.complex_ids]
+
+    def iter_search_targets(self) -> list[tuple[str, str]]:
+        """Return ``(url, label)`` pairs for scraper runs."""
+        if not self.complex_ids:
+            return [(self.build_url(complex_id=None), "all")]
+        return [
+            (self.build_url(complex_id=cid), f"complex:{cid}")
+            for cid in self.complex_ids
+        ]
 
 
 def append_page(search_url: str, page: int) -> str:
